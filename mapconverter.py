@@ -18,7 +18,7 @@ with open('res/map.csv', 'r+') as mapfile, open('source/map.h', 'w') as mapheade
 
         mapsource.write('},')
 
-    mapsource.write('};')
+    mapsource.write('};\n')
 
     mapsource.write('unsigned int mapLen = 32*32;\n')
 
