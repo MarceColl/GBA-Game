@@ -20,16 +20,18 @@ void init() {
 	// Load palette
 	memcpy(pal_bg_mem, tilesetPal, tilesetPalLen);
 	// Load tiles into CBB 0
-	memcpy(&tile_mem[0][0], tilesetTiles, tilesetTilesLen);
+	memcpy(&tile8_mem[0][0], tilesetTiles, tilesetTilesLen);
 	// Load map into SBB 30
 	memcpy16(&se_mem[30][0], map, mapLen);
+
 }
+
 
 
 int main() {
 	init();
 
-	test_palette();
+	//test_palette();
 
 	int frame = 0;
 	while(1)
