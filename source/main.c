@@ -7,6 +7,10 @@
 #include "color.h"
 
 
+#define BOOL u8
+#define TRUE 1
+#define FALSE 0
+
 // VIDEO DEFINITIONS
 #define WIDTH 240
 #define HEIGHT 160
@@ -44,8 +48,6 @@
 #define EVERY_10_FRAMES EVERY_X_FRAMES(10)
 
 
-OBJ_ATTR obj_buffer[128];
-
 
 typedef enum SCROLL_DIR {
 	RIGHT,
@@ -55,11 +57,27 @@ typedef enum SCROLL_DIR {
 	NONE
 } scrolldir;
 
+typedef enum TEAM {
+	BLUE,
+	ORANGE
+} Team;
 
 typedef struct MAP_POS {
 	int x;
 	int y;
 } mappos;
+
+typedef struct UNIT {
+	int index;
+	Team team;
+	int movements_left;
+
+	BOOL placed;
+} Unit;
+
+
+OBJ_ATTR obj_buffer[128];
+Unit units[NUM_UNITS];
 
 
 void init() {
@@ -67,11 +85,11 @@ void init() {
 	irq_init(NULL);
 	irq_add(II_VBLANK, NULL);
 
-	REG_BG0CNT = BG_CBB(0) | BG_SBB(25) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
-	REG_BG1CNT = BG_CBB(0) | BG_SBB(30) | BG_8BPP | BG_REG_32x32 | BG_PRIO(1);
-	REG_BG2CNT = BG_CBB(0) | BG_SBB(20) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
+	REG_BG0CNT = BG_CBB(0) | BG_SBB(20) | BG_8BPP | BG_REG_32x32 | BG_PRIO(2);
+	REG_BG1CNT = BG_CBB(0) | BG_SBB(25) | BG_8BPP | BG_REG_32x32 | BG_PRIO(1);
+	REG_BG2CNT = BG_CBB(0) | BG_SBB(30) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
 
-	// Video mode 0, enable bg 0, 1, 2. Enable object rendering, 2D layout in memory.
+	// Video mode 0, enable bg 0, 1, 2. Enable object rendering, 1D layout in memory.
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	// Load palette
@@ -84,9 +102,9 @@ void init() {
 	memcpy(&tile8_mem[4][0], square_spritesTiles, square_spritesTilesLen);
 
 	// Load map into SBB 30
-	memcpy16(&se_mem[25][0], bg0, bg0Len);
-	memcpy16(&se_mem[30][0], bg1, bg1Len);
-	memcpy16(&se_mem[20][0], bg2, bg2Len);
+	memcpy16(&se_mem[20][0], bg0, bg0Len);
+	memcpy16(&se_mem[25][0], bg1, bg1Len);
+	memcpy16(&se_mem[30][0], bg2, bg2Len);
 
 	oam_init(obj_buffer, 128);
 }
@@ -197,21 +215,32 @@ void animate_water() {
 void animate_units() {
 	static int animation_status = 0;
 	static int dir = 1;
-
+	
 	if(animation_status == 0) {
 		dir = -1;
 	} else if(animation_status == -2) {
+		animation_status = 1;
 		dir = 1;
+	} else if(animation_status == 2) {
+		animation_status = -1;
+		dir -1;
 	}
 
 	animation_status += dir;
 
-	obj_set_pos(&obj_buffer[1], 80, 84+animation_status);
+	for(int i = 0; i < NUM_UNITS; ++i) {
+		if(units[i].placed == FALSE)
+			continue;
+
+		int x = BFN_GET(obj_buffer[units[i].index].attr1, ATTR1_X);
+		int y = BFN_GET(obj_buffer[units[i].index].attr0, ATTR0_Y);
+
+		obj_set_pos(&obj_buffer[units[i].index], x, y + animation_status);
+	}
 }
 
 
-void move_unit(int id) {
-	
+void move_unit(Unit unit) {
 }
 
 
@@ -221,19 +250,27 @@ void init_objects() {
 	obj_set_attr(&obj_buffer[1], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_BLUE_ARCHER | ATTR2_PRIO(0));
 	obj_set_pos(&obj_buffer[1], 80, 84);
 
+	units[0].index = 1;
+	units[0].placed = TRUE;
+
 	obj_set_attr(&obj_buffer[2], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_SHADOW | ATTR2_PRIO(1));
 	obj_set_pos(&obj_buffer[2], 80, 92);
 }
 
 
 int main() {
+	oam_init(obj_buffer, 128);
+	
 	init();
 	init_objects();
 
 	move_map_to(0, 0);
 
+	BOOL placing = TRUE;
+
 	int frame = 0;
 	u16 color;
+
 
 	while(1) {
 		vid_vsync();
