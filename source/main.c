@@ -23,7 +23,9 @@
 #define CURSOR_EDGE_SCREEN_Y HEIGHT/CURSOR_MOVEMENT 
 
 
+#define SPRITES_BEFORE_UNITS 1
 #define NUM_UNITS 6
+#define SHADOW_OFFSET 8
 
 
 // OBJECT INDEXES
@@ -37,8 +39,8 @@
 #define TILE_CURSOR SPRITE_TILE(0)
 #define TILE_SHADOW SPRITE_TILE(1)
 #define TILE_BLUE_ARCHER SPRITE_TILE(2)
-#define TILE_BLUE_SWORDSMAN SPRITE_TILE(3)
-#define TILE_ORANGE_ARCHER SPRITE_TILE(4)
+#define TILE_BLUE_SWORDSMAN SPRITE_TILE(4)
+#define TILE_ORANGE_ARCHER SPRITE_TILE(3)
 #define TILE_ORANGE_SWORDSMAN SPRITE_TILE(5) 
 
 
@@ -110,7 +112,39 @@ void init() {
 }
 
 
+void shift_units(int dx, int dy) {
+	for(int i = 0; i < NUM_UNITS; ++i) {
+		if(units[i].placed == FALSE)
+			continue;
+
+		OBJ_ATTR *obj = &obj_buffer[units[i].index];
+		OBJ_ATTR *shdw_obj = &obj_buffer[units[i].index + 1];
+
+		int x = BFN_GET(obj->attr1, ATTR1_X);
+		int y = BFN_GET(obj->attr0, ATTR0_Y);
+
+		x = x+dx;
+		y = y+dy;
+
+		int shdw_y = y + SHADOW_OFFSET;
+
+		BFN_SET(obj->attr1, x, ATTR1_X);
+		BFN_SET(obj->attr0, y, ATTR0_Y);
+
+		BFN_SET(shdw_obj->attr1, x, ATTR1_X);
+		BFN_SET(shdw_obj->attr0, shdw_y, ATTR0_Y);
+	}
+}
+
 void move_map_to(int VSCR, int HSCR) {
+	static int prev_VSCR = 0;
+	static int prev_HSCR = 0;
+
+	int dVSCR = prev_VSCR - VSCR;
+	int dHSCR = prev_HSCR - HSCR;
+
+	shift_units(dHSCR, dVSCR);
+
 	REG_BG0VOFS = VSCR;
 	REG_BG1VOFS = VSCR;
 	REG_BG2VOFS = VSCR;
@@ -118,6 +152,9 @@ void move_map_to(int VSCR, int HSCR) {
 	REG_BG0HOFS = HSCR;
 	REG_BG1HOFS = HSCR;
 	REG_BG2HOFS = HSCR;
+
+	prev_VSCR = VSCR;
+	prev_HSCR = HSCR;
 }
 
 
@@ -196,8 +233,6 @@ void cursor_movement() {
 		move_map(UP);
 	}
 
-	mappos map_pos = move_map(NONE);
-
 	cursor_timeout++;
 }
 
@@ -219,11 +254,11 @@ void animate_units() {
 	if(animation_status == 0) {
 		dir = -1;
 	} else if(animation_status == -2) {
-		animation_status = 1;
+		animation_status = 0;
 		dir = 1;
 	} else if(animation_status == 2) {
-		animation_status = -1;
-		dir -1;
+		animation_status = 0;
+		dir = -1;
 	}
 
 	animation_status += dir;
@@ -244,23 +279,41 @@ void move_unit(Unit unit) {
 }
 
 
+void add_unit(int type, int x, int y) {
+	static int added_units = 0;
+
+	units[added_units].index = added_units*2 + SPRITES_BEFORE_UNITS;	
+
+	if(type == TILE_BLUE_ARCHER || type == TILE_BLUE_SWORDSMAN) {
+		units[added_units].team = BLUE;
+	}
+	else {
+		units[added_units].team = ORANGE;
+	}
+
+	units[added_units].placed = TRUE;
+
+	obj_set_attr(&obj_buffer[units[added_units].index], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, type | ATTR2_PRIO(0));
+	obj_set_pos(&obj_buffer[units[added_units].index], x, y);
+	
+	obj_set_attr(&obj_buffer[units[added_units].index + 1], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_SHADOW | ATTR2_PRIO(1));
+	obj_set_pos(&obj_buffer[units[added_units].index + 1], x, y + SHADOW_OFFSET);
+
+	added_units++;
+}
+
 void init_objects() {
+	oam_init(obj_buffer, 128);
+	
+	// Initialize cursor
 	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, TILE_CURSOR | ATTR2_PRIO(1));
 
-	obj_set_attr(&obj_buffer[1], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_BLUE_ARCHER | ATTR2_PRIO(0));
-	obj_set_pos(&obj_buffer[1], 80, 84);
-
-	units[0].index = 1;
-	units[0].placed = TRUE;
-
-	obj_set_attr(&obj_buffer[2], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_SHADOW | ATTR2_PRIO(1));
-	obj_set_pos(&obj_buffer[2], 80, 92);
+	add_unit(TILE_ORANGE_ARCHER, 160, 84);
+	add_unit(TILE_BLUE_ARCHER, 80, 84);
 }
 
 
 int main() {
-	oam_init(obj_buffer, 128);
-	
 	init();
 	init_objects();
 
@@ -269,9 +322,6 @@ int main() {
 	BOOL placing = TRUE;
 
 	int frame = 0;
-	u16 color;
-
-
 	while(1) {
 		vid_vsync();
 		VBlankIntrWait();
