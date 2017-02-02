@@ -2,7 +2,6 @@
 #include <tonc.h>
 #include <string.h>
 #include "map.h"
-#include "units.h"
 #include "tileset.h"
 #include "square-sprites.h"
 #include "color.h"
@@ -24,9 +23,19 @@
 #define POBJ_INDEX(id) &obj_buffer[id]
 #define OBJ_CURSOR POBJ_INDEX(0)
 
-#define TILE_AT_POS(_x, _y) bg0[_y][_x]
+
+// SPRITE TILE INDEXES
+#define SPRITE_TILE(index) 8*index
+
+#define TILE_CURSOR SPRITE_TILE(0)
+#define TILE_SHADOW SPRITE_TILE(1)
+#define TILE_BLUE_ARCHER SPRITE_TILE(2)
+#define TILE_BLUE_SWORDSMAN SPRITE_TILE(3)
+#define TILE_ORANGE_ARCHER SPRITE_TILE(4)
+#define TILE_ORANGE_SWORDSMAN SPRITE_TILE(5) 
 
 
+// TIMING MACROS
 #define EVERY_X_FRAMES(frames) if(frame%frames == 0)
 #define EVERY_20_FRAMES EVERY_X_FRAMES(20)
 
@@ -59,18 +68,15 @@ void init() {
 	REG_BG2CNT = BG_CBB(0) | BG_SBB(20) | BG_8BPP | BG_REG_32x32 | BG_PRIO(0);
 
 	// Video mode 0, enable bg 0, 1, 2. Enable object rendering, 2D layout in memory.
-	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_OBJ | DCNT_OBJ_2D;
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	// Load palette
 	memcpy(pal_bg_mem, tilesetPal, tilesetPalLen);
-	memcpy(pal_obj_mem, unitsPal, unitsPalLen);
 	memcpy(pal_obj_mem, square_spritesPal, square_spritesPalLen);
 
 	// Load tiles into CBB 0
 	memcpy(&tile8_mem[0][0], tilesetTiles, tilesetTilesLen);
-	// Load units in memory CBB 4
-	memcpy(&tile8_mem[5][0], unitsTiles, unitsTilesLen);
-	// Load square sprites in CBB 5
+	// Load square sprites in CBB 4
 	memcpy(&tile8_mem[4][0], square_spritesTiles, square_spritesTilesLen);
 
 	// Load map into SBB 30
@@ -121,7 +127,7 @@ mappos move_map(scrolldir dir) {
 void cursor_movement() {
 	static volatile int ccursor_x = 2;
 	static volatile int ccursor_y = 2;
-	static int cursor_timeout = 16;
+	static int cursor_timeout = CURSOR_DELAY + 1;
 
 	static int mvx = 0;
 	static int mvy = 0;
@@ -170,26 +176,28 @@ void cursor_movement() {
 
 	mappos map_pos = move_map(NONE);
 
-	if(TILE_AT_POS(map_pos.x + ccursor_x*16, map_pos.y + ccursor_y*16) == 21) {
-		pal_obj_mem[1] = 123;
-	}
-
 	cursor_timeout++;
 }
 
 
 void animate_water() {
 	u16 col1 = pal_bg_mem[3];
-	u16 col2 = pal_bg_mem[11];
-	u16 col3 = pal_bg_mem[7];
+	u16 col2 = pal_bg_mem[7];
+	u16 col3 = pal_bg_mem[11];
 	pal_bg_mem[3] = col3;
-	pal_bg_mem[11] = col1;
-	pal_bg_mem[7] = col2;
+	pal_bg_mem[7] = col1;
+	pal_bg_mem[11] = col2;
 }
 
 
 void init_objects() {
-	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, 0);
+	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, TILE_CURSOR | ATTR2_PRIO(1));
+
+	obj_set_attr(&obj_buffer[1], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_BLUE_ARCHER | ATTR2_PRIO(0));
+	obj_set_pos(&obj_buffer[1], 80, 84);
+
+	obj_set_attr(&obj_buffer[2], ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_SHADOW | ATTR2_PRIO(1));
+	obj_set_pos(&obj_buffer[2], 80, 92);
 }
 
 
@@ -215,7 +223,7 @@ int main() {
 		cursor_movement();
 
 		// Copy temporal oam memory to oam_memory
-		oam_copy(oam_mem, obj_buffer, 1);
+		oam_copy(oam_mem, obj_buffer, 3);
 
 		frame++;
 	}
