@@ -11,6 +11,8 @@
 #define TRUE 1
 #define FALSE 0
 
+#define forever while(TRUE)
+
 // VIDEO DEFINITIONS
 #define WIDTH 240
 #define HEIGHT 160
@@ -279,6 +281,14 @@ void move_unit(Unit unit) {
 }
 
 
+void placing() {
+	const Team team_order = { ORANGE, BLUE, BLUE, ORANGE, ORANGE, BLUE};
+	static int stage = 0;
+
+	
+}
+
+
 void add_unit(int type, int x, int y) {
 	static int added_units = 0;
 
@@ -322,10 +332,11 @@ int main() {
 	BOOL placing = TRUE;
 
 	int frame = 0;
-	while(1) {
+	forever {
 		vid_vsync();
 		VBlankIntrWait();
 		key_poll();
+
 
 		EVERY_10_FRAMES {
 			animate_units();
