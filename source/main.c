@@ -322,7 +322,7 @@ int main() {
 	BOOL placing = TRUE;
 
 	int frame = 0;
-	while(1) {
+	while(TRUE) {
 		vid_vsync();
 		VBlankIntrWait();
 		key_poll();
