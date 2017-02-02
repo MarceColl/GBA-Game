@@ -25,11 +25,13 @@
 #define CURSOR_EDGE_SCREEN_Y HEIGHT/CURSOR_MOVEMENT 
 
 
-#define SPRITES_BEFORE_UNITS 8
+#define SPRITES_BEFORE_UNITS 13
 #define NUM_UNITS 6
 #define CURSOR_UNIT_OFFSET_Y 12
 #define SHADOW_OFFSET 8
 
+#define NUMBER_HP_BARS 6
+#define NUMBER_VALID_TILES 5
 
 // OBJECT INDEXES
 #define POBJ_INDEX(id) (&obj_buffer[id])
@@ -41,6 +43,11 @@
 #define OBJ_HP_BAR5 	POBJ_INDEX(5)
 #define OBJ_HP_BAR6 	POBJ_INDEX(6)
 #define OBJ_TOOLTIP 	POBJ_INDEX(7)
+#define OBJ_VALID_T1	POBJ_INDEX(8)
+#define OBJ_VALID_T2	POBJ_INDEX(9)
+#define OBJ_VALID_T3	POBJ_INDEX(10)
+#define OBJ_VALID_T4	POBJ_INDEX(11)
+#define OBJ_VALID_T5	POBJ_INDEX(12)
 
 
 // SPRITE TILE INDEXES
@@ -55,6 +62,7 @@
 #define TILE_TOOLTIP 		SPRITE_TILE(6)
 #define TILE_HP_BAR 		SPRITE_TILE(7)
 #define TILE_HP_BAR_L 		SPRITE_TILE(8)
+#define TILE_VALID_T		SPRITE_TILE(9)
 
 
 // TIMING MACROS
@@ -64,7 +72,7 @@
 
 
 // PALETTE
-#define CURSOR_COLOR_INDEX 11
+#define CURSOR_COLOR_INDEX 13
 
 
 typedef enum SCROLL_DIR {
@@ -99,6 +107,9 @@ typedef struct UNIT {
 
 OBJ_ATTR obj_buffer[128];
 Unit units[NUM_UNITS];
+
+OBJ_ATTR* valid_tiles[NUMBER_VALID_TILES] = { OBJ_VALID_T1, OBJ_VALID_T2, OBJ_VALID_T3, OBJ_VALID_T4, OBJ_VALID_T5};
+Team current_team;
 
 int mapx;
 int mapy;
@@ -164,6 +175,19 @@ void shift_units(int dx, int dy) {
 	}
 }
 
+void shift_valid_tiles(int dx, int dy) {
+	for(int i = 0; i < NUMBER_VALID_TILES; ++i) {
+		int x = BFN_GET(valid_tiles[i]->attr1, ATTR1_X);
+		int y = BFN_GET(valid_tiles[i]->attr0, ATTR0_Y);
+
+		x = x+dx;
+		y = y+dy;
+
+		BFN_SET(valid_tiles[i]->attr1, x, ATTR1_X);
+		BFN_SET(valid_tiles[i]->attr0, y, ATTR0_Y);
+	}
+}
+
 void move_map_to(int VSCR, int HSCR) {
 	static int prev_VSCR = 0;
 	static int prev_HSCR = 0;
@@ -172,6 +196,7 @@ void move_map_to(int VSCR, int HSCR) {
 	int dHSCR = prev_HSCR - HSCR;
 
 	shift_units(dHSCR, dVSCR);
+	shift_valid_tiles(dHSCR, dVSCR);
 
 	REG_BG0VOFS = VSCR;
 	REG_BG1VOFS = VSCR;
@@ -396,7 +421,7 @@ int get_unit_at(int x, int y) {
 }
 
 void show_tooltip(u_idx) {
-	OBJ_ATTR* health_bar[6] = { OBJ_HP_BAR1, OBJ_HP_BAR2, OBJ_HP_BAR3, OBJ_HP_BAR4, OBJ_HP_BAR5, OBJ_HP_BAR6 };
+	OBJ_ATTR* health_bar[NUMBER_HP_BARS] = { OBJ_HP_BAR1, OBJ_HP_BAR2, OBJ_HP_BAR3, OBJ_HP_BAR4, OBJ_HP_BAR5, OBJ_HP_BAR6 };
 
 	int hp = units[u_idx].hp;
 	int curx, cury;
@@ -412,7 +437,7 @@ void show_tooltip(u_idx) {
 
 	obj_unhide(OBJ_TOOLTIP, 0);
 
-	for(int i = 0; i < 6 && i < hp; ++i) {
+	for(int i = 0; i < NUMBER_HP_BARS && i < hp; ++i) {
 		BFN_SET(health_bar[i]->attr1, tooltipx + 2 + 2*i, ATTR1_X);
 		BFN_SET(health_bar[i]->attr0, tooltipy + 2, ATTR0_Y);
 		obj_unhide(health_bar[i], 0);
@@ -430,11 +455,38 @@ void hide_tooltip() {
 }
 
 void show_movements(u_idx) {
-		
+	int x = units[u_idx].x;	
+	int y = units[u_idx].y;	
+
+	hide_movements();
+
+	int used_tiles = 0;
+
+	get_cursor_position(&x, &y);
+
+	for(int i = -1; i <= 1; ++i) {
+		for(int j = -1; j <= 1; ++j) {
+			if(valid_tile(x + i*16, y + j*16) == TRUE && i*i + j*j != 2) {
+				obj_unhide(valid_tiles[used_tiles], 0);
+				BFN_SET(valid_tiles[used_tiles]->attr1, x + i*16, ATTR1_X); 
+				BFN_SET(valid_tiles[used_tiles]->attr0, y + j*16, ATTR0_Y); 
+				used_tiles++;	
+			}
+		}
+	}
+}
+
+void hide_movements() {
+	obj_hide(OBJ_VALID_T1);
+	obj_hide(OBJ_VALID_T2);
+	obj_hide(OBJ_VALID_T3);
+	obj_hide(OBJ_VALID_T4);
+	obj_hide(OBJ_VALID_T5);
 }
 
 void fight() {
 	int curx, cury;
+	static BOOL moving = FALSE;
 
 	get_cursor_position(&curx, &cury);
 	int u_idx = get_unit_at(curx, cury);	
@@ -446,8 +498,16 @@ void fight() {
 
 	show_tooltip(u_idx);
 
+	if(current_team != units[u_idx].team)
+		return;
+
 	if(key_hit(KEY_A)) {
 		show_movements(u_idx);
+		moving = TRUE;
+	}
+
+	if(moving == TRUE && key_hit(KEY_B)) {
+		hide_movements();
 	}
 }
 
@@ -463,8 +523,15 @@ void init_objects() {
 	obj_set_attr(OBJ_HP_BAR4, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
 	obj_set_attr(OBJ_HP_BAR5, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
 	obj_set_attr(OBJ_HP_BAR6, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	
+	obj_set_attr(OBJ_VALID_T1, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_VALID_T2, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_VALID_T3, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_VALID_T4, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_VALID_T5, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
 
 	hide_tooltip();
+	hide_movements();
 }
 
 
@@ -475,6 +542,7 @@ int main() {
 	move_map_to(0, 0);
 
 	BOOL isPlacement = TRUE;
+	current_team = ORANGE;
 
 	int frame = 0;
 	forever {
