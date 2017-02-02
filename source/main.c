@@ -75,6 +75,8 @@ typedef struct UNIT {
 	int index;
 	Team team;
 	int movements_left;
+	int x;
+	int y;
 
 	BOOL placed;
 } Unit;
@@ -122,11 +124,14 @@ void shift_units(int dx, int dy) {
 		OBJ_ATTR *obj = &obj_buffer[units[i].index];
 		OBJ_ATTR *shdw_obj = &obj_buffer[units[i].index + 1];
 
-		int x = BFN_GET(obj->attr1, ATTR1_X);
-		int y = BFN_GET(obj->attr0, ATTR0_Y);
+		int x = units[i].x;
+		int y = units[i].y; 
 
 		x = x+dx;
 		y = y+dy;
+
+		units[i].x = x;
+		units[i].y = y;
 
 		int shdw_y = y + SHADOW_OFFSET;
 
@@ -256,11 +261,7 @@ void animate_units() {
 	if(animation_status == 0) {
 		dir = -1;
 	} else if(animation_status == -2) {
-		animation_status = 0;
 		dir = 1;
-	} else if(animation_status == 2) {
-		animation_status = 0;
-		dir = -1;
 	}
 
 	animation_status += dir;
@@ -269,8 +270,8 @@ void animate_units() {
 		if(units[i].placed == FALSE)
 			continue;
 
-		int x = BFN_GET(obj_buffer[units[i].index].attr1, ATTR1_X);
-		int y = BFN_GET(obj_buffer[units[i].index].attr0, ATTR0_Y);
+		int x = units[i].x;
+		int y = units[i].y; 
 
 		obj_set_pos(&obj_buffer[units[i].index], x, y + animation_status);
 	}
@@ -289,6 +290,8 @@ void add_unit(int type, int x, int y) {
 	static int added_units = 0;
 
 	units[added_units].index = added_units*2 + SPRITES_BEFORE_UNITS;	
+	units[added_units].x = x;
+	units[added_units].y = y;
 
 	if(type == TILE_BLUE_ARCHER || type == TILE_BLUE_SWORDSMAN) {
 		units[added_units].team = BLUE;
@@ -316,6 +319,8 @@ BOOL placing() {
 	if(key_hit(KEY_A)) {
 		int a, b;
 		get_cursor_position(&a, &b);
+
+		b -= 12;
 
 		add_unit(unit_order[stage], a, b);
 		stage++;
