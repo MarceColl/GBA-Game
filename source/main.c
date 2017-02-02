@@ -19,6 +19,9 @@
 #define CURSOR_EDGE_SCREEN_Y HEIGHT/CURSOR_MOVEMENT 
 
 
+#define NUM_UNITS 6
+
+
 // OBJECT INDEXES
 #define POBJ_INDEX(id) &obj_buffer[id]
 #define OBJ_CURSOR POBJ_INDEX(0)
@@ -38,6 +41,7 @@
 // TIMING MACROS
 #define EVERY_X_FRAMES(frames) if(frame%frames == 0)
 #define EVERY_20_FRAMES EVERY_X_FRAMES(20)
+#define EVERY_10_FRAMES EVERY_X_FRAMES(10)
 
 
 OBJ_ATTR obj_buffer[128];
@@ -190,6 +194,27 @@ void animate_water() {
 }
 
 
+void animate_units() {
+	static int animation_status = 0;
+	static int dir = 1;
+
+	if(animation_status == 0) {
+		dir = -1;
+	} else if(animation_status == -2) {
+		dir = 1;
+	}
+
+	animation_status += dir;
+
+	obj_set_pos(&obj_buffer[1], 80, 84+animation_status);
+}
+
+
+void move_unit(int id) {
+	
+}
+
+
 void init_objects() {
 	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, TILE_CURSOR | ATTR2_PRIO(1));
 
@@ -215,6 +240,10 @@ int main() {
 		VBlankIntrWait();
 		key_poll();
 
+		EVERY_10_FRAMES {
+			animate_units();
+		}
+
 		EVERY_20_FRAMES {
 			animate_water();
 		}
@@ -223,7 +252,7 @@ int main() {
 		cursor_movement();
 
 		// Copy temporal oam memory to oam_memory
-		oam_copy(oam_mem, obj_buffer, 3);
+		oam_copy(oam_mem, obj_buffer, NUM_UNITS);
 
 		frame++;
 	}
