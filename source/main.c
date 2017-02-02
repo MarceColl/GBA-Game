@@ -54,6 +54,7 @@
 #define TILE_ORANGE_SWORDSMAN 	SPRITE_TILE(5) 
 #define TILE_TOOLTIP 		SPRITE_TILE(6)
 #define TILE_HP_BAR 		SPRITE_TILE(7)
+#define TILE_HP_BAR_L 		SPRITE_TILE(8)
 
 
 // TIMING MACROS
@@ -61,6 +62,9 @@
 #define EVERY_20_FRAMES EVERY_X_FRAMES(20)
 #define EVERY_10_FRAMES EVERY_X_FRAMES(10)
 
+
+// PALETTE
+#define CURSOR_COLOR_INDEX 11
 
 
 typedef enum SCROLL_DIR {
@@ -96,6 +100,10 @@ typedef struct UNIT {
 OBJ_ATTR obj_buffer[128];
 Unit units[NUM_UNITS];
 
+int mapx;
+int mapy;
+
+u16 cursor_color;
 
 void init() {
 	// Init interrupts and VBlank irq.
@@ -124,6 +132,8 @@ void init() {
 	memcpy16(&se_mem[30][0], bg2, bg2Len);
 
 	oam_init(obj_buffer, 128);
+
+	cursor_color = pal_obj_mem[CURSOR_COLOR_INDEX];
 }
 
 
@@ -173,6 +183,9 @@ void move_map_to(int VSCR, int HSCR) {
 
 	prev_VSCR = VSCR;
 	prev_HSCR = HSCR;
+
+	mapx = HSCR;
+	mapy = VSCR;
 }
 
 
@@ -197,6 +210,17 @@ mappos move_map(scrolldir dir) {
 
 
 	move_map_to(VSCR, HSCR);
+}
+
+
+BOOL valid_tile(int x, int y) {
+	int realx = (mapx + x) >> 3;	
+	int realy = (mapy + y) >> 3;
+
+	if(bg0[realy][realx] == 21)
+		return TRUE;
+
+	return FALSE;
 }
 
 
@@ -249,6 +273,13 @@ void cursor_movement() {
 	if(ccursor_y == 0) {
 		ccursor_y++;
 		move_map(UP);
+	}
+
+	if(valid_tile(ccursor_x*16, ccursor_y*16) == FALSE) {
+		pal_obj_mem[CURSOR_COLOR_INDEX] = 123;
+	}
+	else {
+		pal_obj_mem[CURSOR_COLOR_INDEX] = cursor_color;
 	}
 
 	cursor_timeout++;
@@ -340,6 +371,9 @@ BOOL placing() {
 		int a, b;
 		get_cursor_position(&a, &b);
 
+		if(!valid_tile(a, b))
+			return TRUE;
+
 		b -= CURSOR_UNIT_OFFSET_Y;
 
 		add_unit(unit_order[stage], a, b);
@@ -396,7 +430,7 @@ void hide_tooltip() {
 }
 
 void show_movements(u_idx) {
-
+		
 }
 
 void fight() {
@@ -423,7 +457,7 @@ void init_objects() {
 	// Initialize cursor
 	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, TILE_CURSOR | ATTR2_PRIO(1));
 	obj_set_attr(OBJ_TOOLTIP, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_TOOLTIP | ATTR2_PRIO(0));
-	obj_set_attr(OBJ_HP_BAR1, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR1, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR_L | ATTR2_PRIO(0));
 	obj_set_attr(OBJ_HP_BAR2, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
 	obj_set_attr(OBJ_HP_BAR3, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
 	obj_set_attr(OBJ_HP_BAR4, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
