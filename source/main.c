@@ -25,25 +25,35 @@
 #define CURSOR_EDGE_SCREEN_Y HEIGHT/CURSOR_MOVEMENT 
 
 
-#define SPRITES_BEFORE_UNITS 1
+#define SPRITES_BEFORE_UNITS 8
 #define NUM_UNITS 6
+#define CURSOR_UNIT_OFFSET_Y 12
 #define SHADOW_OFFSET 8
 
 
 // OBJECT INDEXES
 #define POBJ_INDEX(id) (&obj_buffer[id])
-#define OBJ_CURSOR POBJ_INDEX(0)
+#define OBJ_CURSOR 	POBJ_INDEX(0)
+#define OBJ_HP_BAR1 	POBJ_INDEX(1)
+#define OBJ_HP_BAR2 	POBJ_INDEX(2)
+#define OBJ_HP_BAR3 	POBJ_INDEX(3)
+#define OBJ_HP_BAR4 	POBJ_INDEX(4)
+#define OBJ_HP_BAR5 	POBJ_INDEX(5)
+#define OBJ_HP_BAR6 	POBJ_INDEX(6)
+#define OBJ_TOOLTIP 	POBJ_INDEX(7)
 
 
 // SPRITE TILE INDEXES
 #define SPRITE_TILE(index) 8*index
 
-#define TILE_CURSOR SPRITE_TILE(0)
-#define TILE_SHADOW SPRITE_TILE(1)
-#define TILE_BLUE_ARCHER SPRITE_TILE(2)
-#define TILE_BLUE_SWORDSMAN SPRITE_TILE(4)
-#define TILE_ORANGE_ARCHER SPRITE_TILE(3)
-#define TILE_ORANGE_SWORDSMAN SPRITE_TILE(5) 
+#define TILE_CURSOR 		SPRITE_TILE(0)
+#define TILE_SHADOW 		SPRITE_TILE(1)
+#define TILE_BLUE_ARCHER 	SPRITE_TILE(2)
+#define TILE_BLUE_SWORDSMAN 	SPRITE_TILE(4)
+#define TILE_ORANGE_ARCHER 	SPRITE_TILE(3)
+#define TILE_ORANGE_SWORDSMAN 	SPRITE_TILE(5) 
+#define TILE_TOOLTIP 		SPRITE_TILE(6)
+#define TILE_HP_BAR 		SPRITE_TILE(7)
 
 
 // TIMING MACROS
@@ -77,6 +87,7 @@ typedef struct UNIT {
 	int movements_left;
 	int x;
 	int y;
+	int hp;
 
 	BOOL placed;
 } Unit;
@@ -278,7 +289,9 @@ void animate_units() {
 }
 
 
-void move_unit(Unit unit) {
+void move_unit(int u_idx, int x, int y) {
+	units[u_idx].x = 16;	
+	units[u_idx].y = 16;	
 }
 
 void get_cursor_position(int *a, int *b) {
@@ -298,6 +311,13 @@ void add_unit(int type, int x, int y) {
 	}
 	else {
 		units[added_units].team = ORANGE;
+	}
+
+	if(type == TILE_BLUE_ARCHER || type == TILE_ORANGE_ARCHER) {
+		units[added_units].hp = 3;
+	}
+	else {
+		units[added_units].hp = 6;
 	}
 
 	units[added_units].placed = TRUE;
@@ -320,7 +340,7 @@ BOOL placing() {
 		int a, b;
 		get_cursor_position(&a, &b);
 
-		b -= 12;
+		b -= CURSOR_UNIT_OFFSET_Y;
 
 		add_unit(unit_order[stage], a, b);
 		stage++;
@@ -332,11 +352,85 @@ BOOL placing() {
 	return TRUE;
 }
 
+int get_unit_at(int x, int y) {
+	for(int i = 0; i < NUM_UNITS; i++) {
+		if(units[i].x == x && units[i].y + CURSOR_UNIT_OFFSET_Y == y)
+			return i;
+	}
+
+	return -1;
+}
+
+void show_tooltip(u_idx) {
+	OBJ_ATTR* health_bar[6] = { OBJ_HP_BAR1, OBJ_HP_BAR2, OBJ_HP_BAR3, OBJ_HP_BAR4, OBJ_HP_BAR5, OBJ_HP_BAR6 };
+
+	int hp = units[u_idx].hp;
+	int curx, cury;
+
+	get_cursor_position(&curx, &cury);
+
+	int tooltipx = curx + 16;
+	int tooltipy = cury - 16 - CURSOR_UNIT_OFFSET_Y;
+
+	
+	BFN_SET(OBJ_TOOLTIP->attr1, tooltipx, ATTR1_X);	
+	BFN_SET(OBJ_TOOLTIP->attr0, tooltipy, ATTR0_Y);	
+
+	obj_unhide(OBJ_TOOLTIP, 0);
+
+	for(int i = 0; i < 6 && i < hp; ++i) {
+		BFN_SET(health_bar[i]->attr1, tooltipx + 2 + 2*i, ATTR1_X);
+		BFN_SET(health_bar[i]->attr0, tooltipy + 2, ATTR0_Y);
+		obj_unhide(health_bar[i], 0);
+	}
+}
+
+void hide_tooltip() {
+	obj_hide(OBJ_TOOLTIP);
+	obj_hide(OBJ_HP_BAR1);
+	obj_hide(OBJ_HP_BAR2);
+	obj_hide(OBJ_HP_BAR3);
+	obj_hide(OBJ_HP_BAR4);
+	obj_hide(OBJ_HP_BAR5);
+	obj_hide(OBJ_HP_BAR6);
+}
+
+void show_movements(u_idx) {
+
+}
+
+void fight() {
+	int curx, cury;
+
+	get_cursor_position(&curx, &cury);
+	int u_idx = get_unit_at(curx, cury);	
+
+	if(u_idx == -1) {
+		hide_tooltip();
+		return;
+	}
+
+	show_tooltip(u_idx);
+
+	if(key_hit(KEY_A)) {
+		show_movements(u_idx);
+	}
+}
+
 void init_objects() {
 	oam_init(obj_buffer, 128);
 	
 	// Initialize cursor
 	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, TILE_CURSOR | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_TOOLTIP, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_TOOLTIP | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR1, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR2, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR3, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR4, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR5, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+	obj_set_attr(OBJ_HP_BAR6, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_HP_BAR | ATTR2_PRIO(0));
+
+	hide_tooltip();
 }
 
 
@@ -354,8 +448,13 @@ int main() {
 		VBlankIntrWait();
 		key_poll();
 
+		// At the beginning of the game it's placement mode.
+		// In placement mode the players take turns to place their units
 		if(isPlacement == TRUE) {
 			isPlacement = placing();
+		}
+		else {
+			fight();
 		}
 
 		EVERY_10_FRAMES {
