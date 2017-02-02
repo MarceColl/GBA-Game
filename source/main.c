@@ -31,7 +31,7 @@
 
 
 // OBJECT INDEXES
-#define POBJ_INDEX(id) &obj_buffer[id]
+#define POBJ_INDEX(id) (&obj_buffer[id])
 #define OBJ_CURSOR POBJ_INDEX(0)
 
 
@@ -280,14 +280,10 @@ void animate_units() {
 void move_unit(Unit unit) {
 }
 
-
-void placing() {
-	const Team team_order = { ORANGE, BLUE, BLUE, ORANGE, ORANGE, BLUE};
-	static int stage = 0;
-
-	
+void get_cursor_position(int *a, int *b) {
+	*a = BFN_GET(OBJ_CURSOR->attr1, ATTR1_X);
+	*b = BFN_GET(OBJ_CURSOR->attr0, ATTR0_Y);
 }
-
 
 void add_unit(int type, int x, int y) {
 	static int added_units = 0;
@@ -312,14 +308,30 @@ void add_unit(int type, int x, int y) {
 	added_units++;
 }
 
+BOOL placing() {
+	const Team team_order[NUM_UNITS] = { ORANGE, BLUE, BLUE, ORANGE, ORANGE, BLUE };
+	const int unit_order[NUM_UNITS] = { TILE_ORANGE_ARCHER, TILE_BLUE_ARCHER, TILE_BLUE_SWORDSMAN, TILE_ORANGE_SWORDSMAN, TILE_ORANGE_SWORDSMAN, TILE_BLUE_SWORDSMAN };
+	static int stage = 0;
+
+	if(key_hit(KEY_A)) {
+		int a, b;
+		get_cursor_position(&a, &b);
+
+		add_unit(unit_order[stage], a, b);
+		stage++;
+	}
+
+	if(stage == NUM_UNITS)
+		return FALSE;
+
+	return TRUE;
+}
+
 void init_objects() {
 	oam_init(obj_buffer, 128);
 	
 	// Initialize cursor
 	obj_set_attr(OBJ_CURSOR, ATTR0_SQUARE | ATTR0_8BPP , ATTR1_SIZE_16, TILE_CURSOR | ATTR2_PRIO(1));
-
-	add_unit(TILE_ORANGE_ARCHER, 160, 84);
-	add_unit(TILE_BLUE_ARCHER, 80, 84);
 }
 
 
@@ -329,7 +341,7 @@ int main() {
 
 	move_map_to(0, 0);
 
-	BOOL placing = TRUE;
+	BOOL isPlacement = TRUE;
 
 	int frame = 0;
 	forever {
@@ -337,6 +349,9 @@ int main() {
 		VBlankIntrWait();
 		key_poll();
 
+		if(isPlacement == TRUE) {
+			isPlacement = placing();
+		}
 
 		EVERY_10_FRAMES {
 			animate_units();
@@ -350,7 +365,7 @@ int main() {
 		cursor_movement();
 
 		// Copy temporal oam memory to oam_memory
-		oam_copy(oam_mem, obj_buffer, NUM_UNITS);
+		oam_copy(oam_mem, obj_buffer, NUM_UNITS*2 + SPRITES_BEFORE_UNITS);
 
 		frame++;
 	}
