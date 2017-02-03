@@ -515,7 +515,16 @@ void show_movements(u_idx) {
 	}
 
 	if(units[u_idx].type == ARCHER) {
-		
+		for(int i = -2; i <= 2; i += 4) {
+			for(int j = -2; j <= 2; j += 4) {
+				if(get_unit_at(x+i*16, y + j*16) != -1 && i*i + j*j != 4) {
+					obj_unhide(attack_tiles[used_attack_tiles], 0);
+					BFN_SET(attack_tiles[used_attack_tiles]->attr1, x + i*16, ATTR1_X); 
+					BFN_SET(attack_tiles[used_attack_tiles]->attr0, y + j*16, ATTR0_Y); 
+					used_attack_tiles++;	
+				}
+			}
+		}
 	}
 }
 
@@ -550,7 +559,7 @@ BOOL at_attack_tile(int x, int y) {
 		int tx = BFN_GET(attack_tiles[i]->attr1, ATTR1_X);
 		int ty = BFN_GET(attack_tiles[i]->attr0, ATTR0_Y);
 		
-		BOOL hidden = BFN_GET(valid_tiles[i]->attr0, ATTR0_MODE);
+		BOOL hidden = BFN_GET(attack_tiles[i]->attr0, ATTR0_MODE);
 
 		if(tx == x && ty == y && hidden == 0)
 			return TRUE;
@@ -569,15 +578,55 @@ void swap_team() {
 }
 
 
+int abs(int a) {
+	return a < 0 ? -1*a : a;  
+}
+
+int getDistance(int ida, int idb) {
+	int ax = units[ida].x;
+	int ay = units[ida].y;
+
+	int bx = units[idb].x;
+	int by = units[idb].y;
+
+	if(ax == bx)
+		return abs(by-ay);
+	else
+		return abs(bx-ax);
+}
+
+
 BOOL attack_unit(int u_idx, int curx, int cury) {
 	int en_id = get_unit_at(curx, cury);	
 
 	Unit attacker = units[u_idx];
 	Unit defender = units[en_id];
 
-	
+	int distance = getDistance(u_idx, en_id);	
+
+	if(attacker.type == ARCHER) {
+		defender.hp -= 15;
+	} else {
+		defender.hp -= 15;
+		attacker.hp -= 10;
+	}
+
+	units[u_idx] = attacker;
+	units[en_id] = defender;
+
+	if(attacker.hp <= 0) {
+		obj_hide(&obj_buffer[units[u_idx].index]);
+		units[u_idx].placed = FALSE;
+	}
+
+	if(defender.hp <= 0) {
+		obj_hide(&obj_buffer[units[en_id].index]);
+		units[en_id].placed = FALSE;
+		return TRUE;
+	}
 
 	return FALSE;
+
 }
 
 
