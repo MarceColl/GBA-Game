@@ -607,14 +607,17 @@ BOOL attack_unit(int u_idx, int curx, int cury) {
 	int distance = getDistance(u_idx, en_id);	
 
 	if(attacker.type == ARCHER) {
-		defender.hp -= 15;
+		defender.hp -= 2;
 	} else {
-		defender.hp -= 15;
-		attacker.hp -= 10;
+		defender.hp -= 2;
+		attacker.hp -= 1;
 	}
 
 	units[u_idx] = attacker;
 	units[en_id] = defender;
+
+	hide_tooltip();
+	show_tooltip(en_id);
 
 	if(attacker.hp <= 0) {
 		obj_hide(&obj_buffer[units[u_idx].index]);
@@ -637,6 +640,7 @@ void fight() {
 	static BOOL isMoving = FALSE;
 	static int moving_unit = -1;
 
+
 	get_cursor_position(&curx, &cury);
 	int u_idx = get_unit_at(curx, cury);	
 
@@ -652,7 +656,7 @@ void fight() {
 	if(!at_movement_tile(curx, cury))
 		show_tooltip(u_idx);
 	
-	if(!at_movement_tile(curx, cury) && current_team != units[u_idx].team)
+	if(!(at_movement_tile(curx, cury) || at_attack_tile(curx, cury)) && current_team != units[u_idx].team)
 		return;
 
 	if(isMoving == TRUE && key_hit(KEY_A) && (at_movement_tile(curx, cury) || at_attack_tile(curx, cury))) {
