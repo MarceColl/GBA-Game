@@ -77,7 +77,7 @@
 
 
 // PALETTE
-#define CURSOR_COLOR_INDEX 13
+#define CURSOR_COLOR_INDEX 14
 
 
 typedef enum SCROLL_DIR {
@@ -456,8 +456,8 @@ void show_tooltip(u_idx) {
 
 	get_cursor_position(&curx, &cury);
 
-	int tooltipx = curx + 16;
-	int tooltipy = cury - 16 - CURSOR_UNIT_OFFSET_Y;
+	int tooltipx = curx;
+	int tooltipy = cury - 10 - CURSOR_UNIT_OFFSET_Y;
 
 	
 	BFN_SET(OBJ_TOOLTIP->attr1, tooltipx, ATTR1_X);	
@@ -515,13 +515,15 @@ void show_movements(u_idx) {
 	}
 
 	if(units[u_idx].type == ARCHER) {
-		for(int i = -2; i <= 2; i += 4) {
-			for(int j = -2; j <= 2; j += 4) {
-				if(get_unit_at(x+i*16, y + j*16) != -1 && i*i + j*j != 4) {
-					obj_unhide(attack_tiles[used_attack_tiles], 0);
-					BFN_SET(attack_tiles[used_attack_tiles]->attr1, x + i*16, ATTR1_X); 
-					BFN_SET(attack_tiles[used_attack_tiles]->attr0, y + j*16, ATTR0_Y); 
-					used_attack_tiles++;	
+		for(int i = -2; i <= 2; i += 2) {
+			for(int j = -2; j <= 2; j += 2) {
+				if(get_unit_at(x+i*16, y + j*16) != -1 && i*i + j*j != 8) {
+					if(units[get_unit_at(x+i*16, y + j*16)].team != current_team) {
+						obj_unhide(attack_tiles[used_attack_tiles], 0);
+						BFN_SET(attack_tiles[used_attack_tiles]->attr1, x + i*16, ATTR1_X); 
+						BFN_SET(attack_tiles[used_attack_tiles]->attr0, y + j*16, ATTR0_Y); 
+						used_attack_tiles++;
+					}
 				}
 			}
 		}
