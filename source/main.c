@@ -346,8 +346,22 @@ void animate_units() {
 
 
 void move_unit(int u_idx, int x, int y) {
-	units[u_idx].x = 16;	
-	units[u_idx].y = 16;	
+	y -= 12;
+
+	OBJ_ATTR *obj = &obj_buffer[units[u_idx].index];
+	OBJ_ATTR *shdw_obj = &obj_buffer[units[u_idx].index + 1];
+
+	units[u_idx].x = x;	
+	units[u_idx].y = y;	
+
+	int shdw_y = y + SHADOW_OFFSET;
+
+	BFN_SET(obj->attr1, x, ATTR1_X);
+	BFN_SET(obj->attr0, y, ATTR0_Y);
+
+	BFN_SET(shdw_obj->attr1, x, ATTR1_X);
+	BFN_SET(shdw_obj->attr0, shdw_y, ATTR0_Y);
+
 }
 
 void get_cursor_position(int *a, int *b) {
@@ -396,7 +410,7 @@ BOOL placing() {
 		int a, b;
 		get_cursor_position(&a, &b);
 
-		if(!valid_tile(a, b))
+		if(!valid_tile(a, b) && get_unit_at(a, b) != -1)
 			return TRUE;
 
 		b -= CURSOR_UNIT_OFFSET_Y;
@@ -413,7 +427,7 @@ BOOL placing() {
 
 int get_unit_at(int x, int y) {
 	for(int i = 0; i < NUM_UNITS; i++) {
-		if(units[i].x == x && units[i].y + CURSOR_UNIT_OFFSET_Y == y)
+		if(units[i].placed == TRUE && units[i].x == x && units[i].y + CURSOR_UNIT_OFFSET_Y == y)
 			return i;
 	}
 
@@ -484,31 +498,65 @@ void hide_movements() {
 	obj_hide(OBJ_VALID_T5);
 }
 
+BOOL at_movement_tile(int x, int y) {
+	for(int i = 0; i < NUMBER_VALID_TILES; ++i) {
+		int tx = BFN_GET(valid_tiles[i]->attr1, ATTR1_X);
+		int ty = BFN_GET(valid_tiles[i]->attr0, ATTR0_Y);
+		
+		BOOL hidden = BFN_GET(valid_tiles[i]->attr0, ATTR0_MODE);
+
+		if(tx == x && ty == y && hidden == 0)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+void swap_team() {
+	if(current_team == ORANGE) {
+		current_team = BLUE;
+	}
+	else {
+		current_team = ORANGE;
+	}
+}
+
 void fight() {
 	int curx, cury;
-	static BOOL moving = FALSE;
+	static BOOL isMoving = FALSE;
+	static int moving_unit = -1;
 
 	get_cursor_position(&curx, &cury);
 	int u_idx = get_unit_at(curx, cury);	
 
-	if(u_idx == -1) {
+	if(isMoving == TRUE && key_hit(KEY_B)) {
+		hide_movements();
+	}
+
+	if(u_idx == -1 && !at_movement_tile(curx, cury)) {
 		hide_tooltip();
 		return;
 	}
-
-	show_tooltip(u_idx);
-
-	if(current_team != units[u_idx].team)
+	
+	if(!at_movement_tile(curx, cury))
+		show_tooltip(u_idx);
+	
+	if(!at_movement_tile(curx, cury) && current_team != units[u_idx].team)
 		return;
 
-	if(key_hit(KEY_A)) {
+	if(isMoving == TRUE && key_hit(KEY_A) && at_movement_tile(curx, cury)) {
+		move_unit(moving_unit, curx, cury);	
+		hide_movements();
+		moving_unit = -1;
+		isMoving = FALSE;
+		swap_team();
+	}
+	else if(key_hit(KEY_A)) {
 		show_movements(u_idx);
-		moving = TRUE;
+		moving_unit = u_idx;
+		isMoving = TRUE;
 	}
 
-	if(moving == TRUE && key_hit(KEY_B)) {
-		hide_movements();
-	}
 }
 
 void init_objects() {
