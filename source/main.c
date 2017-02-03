@@ -25,13 +25,14 @@
 #define CURSOR_EDGE_SCREEN_Y HEIGHT/CURSOR_MOVEMENT 
 
 
-#define SPRITES_BEFORE_UNITS 13
+#define SPRITES_BEFORE_UNITS 16
 #define NUM_UNITS 6
 #define CURSOR_UNIT_OFFSET_Y 12
 #define SHADOW_OFFSET 8
 
 #define NUMBER_HP_BARS 6
 #define NUMBER_VALID_TILES 5
+#define NUMBER_ATTACK_TILES 3 
 
 // OBJECT INDEXES
 #define POBJ_INDEX(id) (&obj_buffer[id])
@@ -48,6 +49,9 @@
 #define OBJ_VALID_T3	POBJ_INDEX(10)
 #define OBJ_VALID_T4	POBJ_INDEX(11)
 #define OBJ_VALID_T5	POBJ_INDEX(12)
+#define OBJ_ATTACK_T1   POBJ_INDEX(13)
+#define OBJ_ATTACK_T2   POBJ_INDEX(14)
+#define OBJ_ATTACK_T3   POBJ_INDEX(15)
 
 
 // SPRITE TILE INDEXES
@@ -63,6 +67,7 @@
 #define TILE_HP_BAR 		SPRITE_TILE(7)
 #define TILE_HP_BAR_L 		SPRITE_TILE(8)
 #define TILE_VALID_T		SPRITE_TILE(9)
+#define TILE_ATTACK_T		SPRITE_TILE(10)
 
 
 // TIMING MACROS
@@ -93,6 +98,11 @@ typedef struct MAP_POS {
 	int y;
 } mappos;
 
+typedef enum UNITTYPE {
+	ARCHER,
+	SWORDSMAN
+} UnitType;
+
 typedef struct UNIT {
 	int index;
 	Team team;
@@ -100,6 +110,7 @@ typedef struct UNIT {
 	int x;
 	int y;
 	int hp;
+	UnitType type;
 
 	BOOL placed;
 } Unit;
@@ -109,6 +120,7 @@ OBJ_ATTR obj_buffer[128];
 Unit units[NUM_UNITS];
 
 OBJ_ATTR* valid_tiles[NUMBER_VALID_TILES] = { OBJ_VALID_T1, OBJ_VALID_T2, OBJ_VALID_T3, OBJ_VALID_T4, OBJ_VALID_T5};
+OBJ_ATTR* attack_tiles[NUMBER_ATTACK_TILES] = { OBJ_ATTACK_T1, OBJ_ATTACK_T2, OBJ_ATTACK_T3 };
 Team current_team;
 
 int mapx;
@@ -385,9 +397,11 @@ void add_unit(int type, int x, int y) {
 
 	if(type == TILE_BLUE_ARCHER || type == TILE_ORANGE_ARCHER) {
 		units[added_units].hp = 3;
+		units[added_units].type = ARCHER;
 	}
 	else {
 		units[added_units].hp = 6;
+		units[added_units].type = SWORDSMAN;
 	}
 
 	units[added_units].placed = TRUE;
@@ -475,18 +489,33 @@ void show_movements(u_idx) {
 	hide_movements();
 
 	int used_tiles = 0;
+	int used_attack_tiles = 0;
 
 	get_cursor_position(&x, &y);
 
 	for(int i = -1; i <= 1; ++i) {
 		for(int j = -1; j <= 1; ++j) {
 			if(valid_tile(x + i*16, y + j*16) == TRUE && i*i + j*j != 2) {
-				obj_unhide(valid_tiles[used_tiles], 0);
-				BFN_SET(valid_tiles[used_tiles]->attr1, x + i*16, ATTR1_X); 
-				BFN_SET(valid_tiles[used_tiles]->attr0, y + j*16, ATTR0_Y); 
-				used_tiles++;	
+				if(get_unit_at(x+i*16, y + j*16) == -1 || (i == 0 && j == 0)) {
+					obj_unhide(valid_tiles[used_tiles], 0);
+					BFN_SET(valid_tiles[used_tiles]->attr1, x + i*16, ATTR1_X); 
+					BFN_SET(valid_tiles[used_tiles]->attr0, y + j*16, ATTR0_Y); 
+					used_tiles++;	
+				}
+				else {
+					if(units[get_unit_at(x+i*16, y+j*16)].team != current_team) {
+						obj_unhide(attack_tiles[used_attack_tiles], 0);
+						BFN_SET(attack_tiles[used_attack_tiles]->attr1, x + i*16, ATTR1_X); 
+						BFN_SET(attack_tiles[used_attack_tiles]->attr0, y + j*16, ATTR0_Y);
+						used_attack_tiles++;	
+					}
+				}
 			}
 		}
+	}
+
+	if(units[u_idx].type == ARCHER) {
+		
 	}
 }
 
@@ -496,12 +525,30 @@ void hide_movements() {
 	obj_hide(OBJ_VALID_T3);
 	obj_hide(OBJ_VALID_T4);
 	obj_hide(OBJ_VALID_T5);
+	
+	obj_hide(OBJ_ATTACK_T1);
+	obj_hide(OBJ_ATTACK_T2);
+	obj_hide(OBJ_ATTACK_T3);
 }
 
 BOOL at_movement_tile(int x, int y) {
 	for(int i = 0; i < NUMBER_VALID_TILES; ++i) {
 		int tx = BFN_GET(valid_tiles[i]->attr1, ATTR1_X);
 		int ty = BFN_GET(valid_tiles[i]->attr0, ATTR0_Y);
+		
+		BOOL hidden = BFN_GET(valid_tiles[i]->attr0, ATTR0_MODE);
+
+		if(tx == x && ty == y && hidden == 0)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+BOOL at_attack_tile(int x, int y) {
+	for(int i = 0; i < NUMBER_ATTACK_TILES; ++i) {
+		int tx = BFN_GET(attack_tiles[i]->attr1, ATTR1_X);
+		int ty = BFN_GET(attack_tiles[i]->attr0, ATTR0_Y);
 		
 		BOOL hidden = BFN_GET(valid_tiles[i]->attr0, ATTR0_MODE);
 
@@ -521,6 +568,19 @@ void swap_team() {
 	}
 }
 
+
+BOOL attack_unit(int u_idx, int curx, int cury) {
+	int en_id = get_unit_at(curx, cury);	
+
+	Unit attacker = units[u_idx];
+	Unit defender = units[en_id];
+
+	
+
+	return FALSE;
+}
+
+
 void fight() {
 	int curx, cury;
 	static BOOL isMoving = FALSE;
@@ -533,7 +593,7 @@ void fight() {
 		hide_movements();
 	}
 
-	if(u_idx == -1 && !at_movement_tile(curx, cury)) {
+	if(u_idx == -1 && !(at_movement_tile(curx, cury) || at_attack_tile(curx, cury))) {
 		hide_tooltip();
 		return;
 	}
@@ -544,13 +604,22 @@ void fight() {
 	if(!at_movement_tile(curx, cury) && current_team != units[u_idx].team)
 		return;
 
-	if(isMoving == TRUE && key_hit(KEY_A) && at_movement_tile(curx, cury)) {
-		move_unit(moving_unit, curx, cury);	
+	if(isMoving == TRUE && key_hit(KEY_A) && (at_movement_tile(curx, cury) || at_attack_tile(curx, cury))) {
+		BOOL enemy_unit_killed = FALSE;
+
+		if(at_attack_tile(curx, cury)) {
+			enemy_unit_killed = attack_unit(moving_unit, curx, cury);
+		}
+		if(at_movement_tile(curx, cury) || enemy_unit_killed == TRUE) {
+			move_unit(moving_unit, curx, cury);	
+		}
+
 		hide_movements();
 		moving_unit = -1;
 		isMoving = FALSE;
 		swap_team();
 	}
+
 	else if(key_hit(KEY_A)) {
 		show_movements(u_idx);
 		moving_unit = u_idx;
@@ -577,6 +646,10 @@ void init_objects() {
 	obj_set_attr(OBJ_VALID_T3, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
 	obj_set_attr(OBJ_VALID_T4, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
 	obj_set_attr(OBJ_VALID_T5, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_VALID_T | ATTR2_PRIO(1));
+	
+	obj_set_attr(OBJ_ATTACK_T1, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_ATTACK_T | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_ATTACK_T2, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_ATTACK_T | ATTR2_PRIO(1));
+	obj_set_attr(OBJ_ATTACK_T3, ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_16, TILE_ATTACK_T | ATTR2_PRIO(1));
 
 	hide_tooltip();
 	hide_movements();
